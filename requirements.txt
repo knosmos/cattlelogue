@@ -1,0 +1,10 @@
+netcdf4==1.7.2
+basemap==1.4.1
+matplotlib==3.8.4
+numpy==1.26
+libtiff==0.7.0
+scikit-learn==1.6.1
+tifffile==2025.6.11
+tdqm==4.67.0
+earthengine-api==1.5.22
+opencv-python==4.10.0.84
