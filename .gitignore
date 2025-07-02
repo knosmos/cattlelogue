@@ -1,5 +1,6 @@
+__pycache__/
+*.py[cod]
+
 # ignore large files
-ta_Amon_GISS-E2-1-G_ssp460_r1i1p1f2_gn_20150116-21001216.nc
-ts_Amon_GISS-E2-1-G_ssp460_r1i1p1f2_gn_20150116-21001216.nc
-pr_Amon_GISS-E2-1-G_ssp460_r1i1p1f2_gn_20150116-21001216.nc
+*.nc
 livestock_model.joblib
