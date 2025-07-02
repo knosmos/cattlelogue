@@ -44,18 +44,20 @@ def upscale_to_glw4(glw4_shape, cmip_data):
     return cmip_data_resized
 
 
-def process_timeseries_data(timeseries_fname, shape):
+def year_to_index(year):
+    return (year - 2015) * 12
+
+
+def process_timeseries_data(timeseries_fname, shape, year=2015):
+    start, end = year_to_index(year), year_to_index(year + 1)
     with nc.Dataset(timeseries_fname) as ds:
         for var_name, data in ds.variables.items():
             if var_name in timeseries_fname.split("/")[-1].split("_"):
-                cmip_data = cv2.merge(data[:12])
+                cmip_data = cv2.merge(data[start:end])
                 cmip_data = fourier(cmip_data)[0]
                 cmip_data_resized = upscale_to_glw4(shape, cmip_data)
                 print(
-                    "Processed timeseries variable:",
-                    var_name,
-                    "with shape:",
-                    cmip_data_resized.shape,
+                    f"Processed timeseries variable {var_name} with shape {cmip_data_resized.shape}",
                 )
                 return cmip_data_resized
 
@@ -68,10 +70,7 @@ def process_fixed_data(fixed_data, shape):
                 cmip_data_resized = upscale_to_glw4(shape, cmip_data)
                 cmip_data_resized = cmip_data_resized[:, :, np.newaxis]
                 print(
-                    "Processed fixed variable:",
-                    var_name,
-                    "with shape:",
-                    cmip_data_resized.shape,
+                    f"Processed fixed variable {var_name} with shape {cmip_data_resized.shape}"
                 )
                 return cmip_data_resized
 
@@ -79,10 +78,12 @@ def process_fixed_data(fixed_data, shape):
 def load_glw4_data():
     glw4_path = os.path.join(BASE_PATH, LIVESTOCK_DENSITY_PATH)
     glw4_data = imread(glw4_path, key=3)
+    # FAO plots the prime meridian at the center whereas CMIP data places it at the left edge
+    glw4_data = np.roll(glw4_data, glw4_data.shape[1] // 2, axis=1)
     return glw4_data, glw4_data.shape
 
 
-def build_dataset():
+def build_dataset(year=2015):
     """
     Builds a dataset for livestock density prediction using GLW4 data and CMIP6 timeseries data.
     The dataset includes feature vectors from CMIP6 timeseries data and livestock density data from GLW4.
@@ -96,7 +97,9 @@ def build_dataset():
     # Process timeseries data
     for path in TIMESERIES_NC_PATHS:
         datasets.append(
-            process_timeseries_data(os.path.join(BASE_PATH, path), glw4_shape)
+            process_timeseries_data(
+                os.path.join(BASE_PATH, path), glw4_shape, year=year
+            )
         )
 
     # Process fixed data
@@ -110,4 +113,5 @@ def build_dataset():
     return {
         "features": features,
         "livestock_density": glw4_data.flatten(),
+        "glw4_shape": glw4_shape,
     }

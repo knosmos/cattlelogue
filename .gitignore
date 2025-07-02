@@ -3,4 +3,4 @@ __pycache__/
 
 # ignore large files
 *.nc
-livestock_model.joblib
+*.joblib
