@@ -34,7 +34,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 @click.option(
     "--output",
     type=str,
-    default="livestock_density_predictions.png",
+    default="",
     help="Output file for the prediction visualization",
 )
 def visualize_predictions(
@@ -104,9 +104,10 @@ def visualize_predictions(
     plt.gca().set_xticks([])
     plt.gca().set_yticks([])
     plt.colorbar(label="Livestock Density (animals/km^2 * pixel area)", fraction=0.04)
-    if output:
-        plt.savefig(output, bbox_inches="tight", pad_inches=0.1)
-        print(f"Prediction visualization saved to {output}")
+    if output == "":
+        output = os.path.join(BASE_DIR, f"outputs/projections_{year}.png")
+    plt.savefig(output, bbox_inches="tight", pad_inches=0.1, dpi=500)
+    print(f"Projection visualization saved to {output}")
     plt.show()
 
 
