@@ -1,6 +1,7 @@
 import numpy as np
 
 from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 
@@ -10,29 +11,42 @@ from rich import print
 
 from cattlelogue.datasets import build_dataset
 
+# CROP: n_est = 20, max_depth = 4
+# PASTURE: n_est = 100, max_depth = 4
+
 
 @click.command()
 @click.option(
-    "--test_size", type=float, default=0.8, help="Proportion of data to use for testing"
+    "--test_size", type=float, default=0.1, help="Proportion of data to use for testing"
 )
 @click.option(
-    "--n_estimators", type=int, default=50, help="Number of estimators for AdaBoost"
+    "--n_estimators", type=int, default=100, help="Number of estimators for AdaBoost"
 )
 @click.option(
-    "--output", type=str, default="livestock_model.joblib", help="Output model file"
+    "--ground_truth",
+    type=str,
+    default="worldcereal_data",
+    help="Ground truth dataset to use",
 )
-def train_model(test_size, n_estimators, output):
+@click.option(
+    "--output", type=str, default="crop_model.joblib", help="Output model file"
+)
+def train_model(test_size, n_estimators, ground_truth, output):
     """
     Train a livestock density prediction model using AdaBoost with Random Forest as the base estimator.
     """
     # Load datasets
-    dataset = build_dataset()
+    dataset = build_dataset(process_ee=True)
+    print("Datasets loaded successfully")
     feature_vectors = dataset["features"]
+    ground_truth_set = dataset[ground_truth]
+    # labels = livestock_data.reshape(-1, 1)
+    labels = ground_truth_set.reshape(-1, 1)
+
     livestock_data = dataset["livestock_density"]
-    labels = livestock_data.reshape(-1, 1)
 
     # Filter out invalid data points
-    valid_indices = np.where(labels >= 0)[0]
+    valid_indices = np.where(livestock_data >= 0)[0]
     feature_vectors = feature_vectors[valid_indices]
     labels = labels[valid_indices]
 
@@ -43,7 +57,10 @@ def train_model(test_size, n_estimators, output):
 
     # Initialize and fit the model
     model = AdaBoostRegressor(
-        estimator=RandomForestRegressor(n_estimators=50, random_state=42, verbose=1),
+        # estimator=RandomForestRegressor(n_estimators=50, random_state=42, verbose=1),
+        estimator=DecisionTreeRegressor(
+            max_depth=4, min_samples_split=100, random_state=42
+        ),
         n_estimators=n_estimators,
         random_state=42,
     )

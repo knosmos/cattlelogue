@@ -66,7 +66,7 @@ def visualize_predictions(
     if not use_cached:
         model = load(model_path)
 
-        dataset = build_dataset(year=year)
+        dataset = build_dataset(year=year, process_ee=False)
         feature_vectors, livestock_data, glw4_shape = (
             dataset["features"],
             dataset["livestock_density"],
