@@ -116,9 +116,9 @@ def initialize_earth_engine() -> None:
 
 
 def load_worldcereal_data() -> np.ndarray:
-    if os.path.exists(os.path.join(BASE_PATH, "worldcereal_data.npy")):
+    if os.path.exists(os.path.join(BASE_PATH, "inputs/worldcereal_data.npy")):
         print("Loading cached WorldCereal data from numpy file.")
-        return np.load(os.path.join(BASE_PATH, "worldcereal_data.npy"))
+        return np.load(os.path.join(BASE_PATH, "inputs/worldcereal_data.npy"))
     cereal_data = ee.ImageCollection(WORLDCEREAL_ID).select("classification").mosaic()
     cereal_npy = ee.data.computePixels(
         {
@@ -140,15 +140,15 @@ def load_worldcereal_data() -> np.ndarray:
         }
     )
     data = cereal_npy["classification"]
-    np.save(os.path.join(BASE_PATH, "worldcereal_data.npy"), data)
+    np.save(os.path.join(BASE_PATH, "inputs/worldcereal_data.npy"), data)
     print(f"WorldCereal data loaded with shape {data.shape}")
     return data
 
 
 def load_human_modification_index() -> np.ndarray:
-    if os.path.exists(os.path.join(BASE_PATH, "human_modification.npy")):
+    if os.path.exists(os.path.join(BASE_PATH, "inputs/human_modification.npy")):
         print("Loading cached Human Modification Index data from numpy file.")
-        return np.load(os.path.join(BASE_PATH, "human_modification.npy"))
+        return np.load(os.path.join(BASE_PATH, "inputs/human_modification.npy"))
     human_modification = ee.ImageCollection(HUMAN_MODIF_ID).select("gHM")
     human_modif_npy = ee.data.computePixels(
         {
@@ -172,15 +172,15 @@ def load_human_modification_index() -> np.ndarray:
         }
     )
     data = human_modif_npy["gHM"]
-    np.save(os.path.join(BASE_PATH, "human_modification.npy"), data)
+    np.save(os.path.join(BASE_PATH, "inputs/human_modification.npy"), data)
     print(f"Human Modification Index data loaded with shape {data.shape}")
     return data
 
 
 def load_pasture_watch_data() -> np.ndarray:
-    if os.path.exists(os.path.join(BASE_PATH, "pasture_watch.npy")):
+    if os.path.exists(os.path.join(BASE_PATH, "inputs/pasture_watch.npy")):
         print("Loading cached Pasture Watch data from numpy file.")
-        return np.load(os.path.join(BASE_PATH, "pasture_watch.npy"))
+        return np.load(os.path.join(BASE_PATH, "inputs/pasture_watch.npy"))
     pasture_watch = (
         ee.ImageCollection(PASTURE_WCH_ID)
         .select("probability")
@@ -209,7 +209,7 @@ def load_pasture_watch_data() -> np.ndarray:
         }
     )
     data = pasture_watch_npy["probability"]
-    np.save(os.path.join(BASE_PATH, "pasture_watch.npy"), data)
+    np.save(os.path.join(BASE_PATH, "inputs/pasture_watch.npy"), data)
     print(f"Pasture Watch data loaded with shape {data.shape}")
     return data
 
