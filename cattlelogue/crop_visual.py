@@ -122,7 +122,6 @@ def visualize_predictions_year(
     plt.figure(figsize=(12, 6))
     plt.rcParams.update({"font.family": "Segoe UI", "font.size": 8})
     plt.title(f"Projected Cereal Crop Density Map - {year}".upper(), weight="bold")
-    plt.gca().set_facecolor("whitesmoke")
     plt.imshow(
         predictions_reshaped,
         cmap="plasma",
