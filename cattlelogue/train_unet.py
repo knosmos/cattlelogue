@@ -4,7 +4,7 @@ from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
 
 from cattlelogue.unet import UNet
-from cattlelogue.datasets import build_dataset
+from cattlelogue.datasets import build_dataset, load_rf_results
 
 import os
 import numpy as np

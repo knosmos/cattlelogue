@@ -6,7 +6,8 @@ from tqdm import tqdm
 
 @click.command()
 @click.option("--prefix", type=str, default="crop", help="Prefix for the image files")
-def generate_gif(prefix):
+@click.option("--downsample", type=int, default=1, help="Downsample factor for images")
+def generate_gif(prefix, downsample):
     """
     Generate a GIF from a series of images with the specified prefix.
     """
@@ -28,7 +29,9 @@ def generate_gif(prefix):
         os.path.join(OUTPUT_DIR, f"{prefix}.gif"), mode="I", loop=0
     ) as writer:
         for filename in tqdm(filenames):
-            image = imageio.imread(filename)
+            image = imageio.v2.imread(filename)
+            if downsample > 1:
+                image = image[::downsample, ::downsample]
             writer.append_data(image)
 
     print(f"GIF saved as {os.path.join(OUTPUT_DIR, f'{prefix}.gif')}")
