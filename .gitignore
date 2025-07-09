@@ -3,4 +3,3 @@ __pycache__/
 
 # ignore large files
 *.nc
-*.joblib

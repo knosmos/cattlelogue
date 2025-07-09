@@ -31,9 +31,9 @@ from cattlelogue.datasets import build_dataset
 @click.option(
     "--output", type=str, default="crop_model.joblib", help="Output model file"
 )
-def train_model(test_size, n_estimators, ground_truth, output):
+def train_model(test_size, n_estimators, ground_truth, output) -> None:
     """
-    Train a livestock density prediction model using AdaBoost with Random Forest as the base estimator.
+    Train a density prediction model using AdaBoost on decision trees regressors.
     """
     # Load datasets
     dataset = build_dataset(process_ee=True)

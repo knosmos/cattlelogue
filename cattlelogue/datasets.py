@@ -34,6 +34,7 @@ if file_error_flag:
 WORLDCEREAL_ID = "ESA/WorldCereal/2021/MODELS/v100"
 HUMAN_MODIF_ID = "CSP/HM/GlobalHumanModification"
 PASTURE_WCH_ID = "projects/global-pasture-watch/assets/ggc-30m/v1/cultiv-grassland_p"
+CITY_DISTAN_ID = "Oxford/MAP/accessibility_to_cities_2015_v1_0"
 SCALE_FACTOR = 10
 
 """ LOCALLY STORED DATASETS """
@@ -70,8 +71,8 @@ def process_timeseries_data(timeseries_fname, shape, year=2015) -> np.ndarray:
             if var_name in timeseries_fname.split("/")[-1].split("_"):
                 cmip_data = cv2.merge(data[start:end])
                 cmip_data = np.flipud(cmip_data)
-                cmip_data = np.roll(cmip_data, shift=540 // 2, axis=1)
-                # cmip_data = fourier(cmip_data)[0]
+                cmip_data = np.roll(cmip_data, shift=cmip_data.shape[1] // 2, axis=1)
+                cmip_data = fourier(cmip_data)[0]
                 cmip_data_resized = upscale_to_glw4(shape, cmip_data)
                 print(
                     f"Processed timeseries variable {var_name} with shape {cmip_data_resized.shape}",
@@ -85,7 +86,7 @@ def process_fixed_data(fixed_data, shape) -> np.ndarray:
             if var_name in fixed_data.split("/")[-1].split("_"):
                 cmip_data = data[:]
                 cmip_data = np.flipud(cmip_data)
-                cmip_data = np.roll(cmip_data, shift=540 // 2)
+                cmip_data = np.roll(cmip_data, shift=cmip_data.shape[1] // 2, axis=1)
                 cmip_data_resized = upscale_to_glw4(shape, cmip_data)
                 cmip_data_resized = cmip_data_resized[:, :, np.newaxis]
                 print(
@@ -96,9 +97,9 @@ def process_fixed_data(fixed_data, shape) -> np.ndarray:
 
 def load_glw4_data() -> tuple[np.ndarray, tuple[int, int]]:
     glw4_path = os.path.join(BASE_PATH, LIVESTOCK_DENSITY_PATH)
-    glw4_data = imread(glw4_path, key=3)
+    glw4_data = imread(glw4_path, key=1)
     # FAO plots the prime meridian at the center whereas CMIP data places it at the left edge
-    glw4_data = np.roll(glw4_data, glw4_data.shape[1] // 2, axis=1)
+    # glw4_data = np.roll(glw4_data, glw4_data.shape[1] // 2, axis=1)
     return glw4_data, glw4_data.shape
 
 
@@ -174,6 +175,37 @@ def load_human_modification_index() -> np.ndarray:
     data = human_modif_npy["gHM"]
     np.save(os.path.join(BASE_PATH, "inputs/human_modification.npy"), data)
     print(f"Human Modification Index data loaded with shape {data.shape}")
+    return data
+
+
+def load_city_distance_data() -> np.ndarray:
+    if os.path.exists(os.path.join(BASE_PATH, "inputs/city_distance.npy")):
+        print("Loading cached City Distance data from numpy file.")
+        return np.load(os.path.join(BASE_PATH, "inputs/city_distance.npy"))
+    city_distance = ee.Image(CITY_DISTAN_ID).select("accessibility")
+    city_distance_npy = ee.data.computePixels(
+        {
+            "expression": city_distance,
+            "fileFormat": "NUMPY_NDARRAY",
+            "grid": {
+                "dimensions": {
+                    "width": 360 * SCALE_FACTOR,
+                    "height": 180 * SCALE_FACTOR,
+                },
+                "affineTransform": {
+                    "scaleX": 1 / SCALE_FACTOR,
+                    "shearX": 0,
+                    "translateX": -180,
+                    "shearY": 0,
+                    "scaleY": -1 / SCALE_FACTOR,
+                    "translateY": 90,
+                },
+            },
+        }
+    )
+    data = city_distance_npy["accessibility"]
+    np.save(os.path.join(BASE_PATH, "inputs/city_distance.npy"), data)
+    print(f"City Distance data loaded with shape {data.shape}")
     return data
 
 
@@ -255,9 +287,17 @@ def build_dataset(year=2015, process_ee=True) -> dict:
         pasture_watch_data = load_pasture_watch_data()
         pasture_watch_data = upscale_to_glw4(glw4_shape, pasture_watch_data)
 
+        city_distance_data = load_city_distance_data()
+        city_distance_data = upscale_to_glw4(glw4_shape, city_distance_data)
+
         worldcereal_data = worldcereal_data.reshape(-1, 1)
         human_modification_index = human_modification_index.reshape(-1, 1)
         pasture_watch_data = pasture_watch_data.reshape(-1, 1)
+        city_distance_data = city_distance_data.reshape(-1, 1)
+
+        features = np.hstack(
+            (features, city_distance_data)
+        )
 
     return {
         "features": features,
