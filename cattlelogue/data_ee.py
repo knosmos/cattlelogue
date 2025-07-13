@@ -5,6 +5,7 @@ Just a test script for visualizing Earth Engine data (sanity check to determine 
 import numpy as np
 import matplotlib.pyplot as plt
 import ee
+import os
 
 ee.Authenticate()
 ee.Initialize()
@@ -38,11 +39,35 @@ SCALE_FACTOR = 10
 #     }
 # )
 
-CITY_DISTAN_ID = "Oxford/MAP/accessibility_to_cities_2015_v1_0"
-city_distance = ee.Image(CITY_DISTAN_ID).select("accessibility")
-city_distance_npy = ee.data.computePixels(
+# CITY_DISTAN_ID = "Oxford/MAP/accessibility_to_cities_2015_v1_0"
+# city_distance = ee.Image(CITY_DISTAN_ID).select("accessibility")
+# city_distance_npy = ee.data.computePixels(
+#     {
+#         "expression": city_distance,
+#         "fileFormat": "NUMPY_NDARRAY",
+#         "grid": {
+#             "dimensions": {
+#                 "width": 360 * SCALE_FACTOR,
+#                 "height": 180 * SCALE_FACTOR,
+#             },
+#             "affineTransform": {
+#                 "scaleX": 1 / SCALE_FACTOR,
+#                 "shearX": 0,
+#                 "translateX": -180,
+#                 "shearY": 0,
+#                 "scaleY": -1 / SCALE_FACTOR,
+#                 "translateY": 90,
+#             },
+#         },
+#     }
+# )
+# data = city_distance_npy["accessibility"]
+
+WORLDCEREAL_ID = "ESA/WorldCereal/2021/MODELS/v100"
+cereal_data = ee.ImageCollection(WORLDCEREAL_ID).select("classification").mosaic()
+cereal_npy = ee.data.computePixels(
     {
-        "expression": city_distance,
+        "expression": cereal_data,
         "fileFormat": "NUMPY_NDARRAY",
         "grid": {
             "dimensions": {
@@ -52,7 +77,6 @@ city_distance_npy = ee.data.computePixels(
             "affineTransform": {
                 "scaleX": 1 / SCALE_FACTOR,
                 "shearX": 0,
-                "translateX": -180,
                 "shearY": 0,
                 "scaleY": -1 / SCALE_FACTOR,
                 "translateY": 90,
@@ -60,7 +84,7 @@ city_distance_npy = ee.data.computePixels(
         },
     }
 )
-data = city_distance_npy["accessibility"]
+data = cereal_npy["classification"]
 
 fig = plt.figure(figsize=(10, 5))
 #human_modif_npy_band = human_modif_npy["probability"]

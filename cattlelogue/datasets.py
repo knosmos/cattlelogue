@@ -46,9 +46,13 @@ def fourier(timeseries) -> tuple[np.ndarray, np.ndarray]:
     fourier_transform = np.fft.fft(timeseries)
     return np.abs(fourier_transform), freq
 
+def time_average(timeseries) -> np.ndarray:
+    return np.mean(timeseries, axis=2)
+
 
 def upscale_to_glw4(glw4_shape, cmip_data) -> np.ndarray:
     # Assuming cmip_data is a 3D array and glw4_shape is the target shape
+    cmip_data = cmip_data.astype(np.float32)
     if glw4_shape[0] > cmip_data.shape[0] or glw4_shape[1] > cmip_data.shape[1]:
         cmip_data_resized = cv2.resize(
             cmip_data, (glw4_shape[1], glw4_shape[0]), interpolation=cv2.INTER_CUBIC
@@ -73,6 +77,7 @@ def process_timeseries_data(timeseries_fname, shape, year=2015) -> np.ndarray:
                 cmip_data = np.flipud(cmip_data)
                 cmip_data = np.roll(cmip_data, shift=cmip_data.shape[1] // 2, axis=1)
                 cmip_data = fourier(cmip_data)[0]
+                # cmip_data = time_average(cmip_data)
                 cmip_data_resized = upscale_to_glw4(shape, cmip_data)
                 print(
                     f"Processed timeseries variable {var_name} with shape {cmip_data_resized.shape}",
@@ -95,9 +100,9 @@ def process_fixed_data(fixed_data, shape) -> np.ndarray:
                 return cmip_data_resized
 
 
-def load_glw4_data() -> tuple[np.ndarray, tuple[int, int]]:
+def load_glw4_data(resolution=1) -> tuple[np.ndarray, tuple[int, int]]:
     glw4_path = os.path.join(BASE_PATH, LIVESTOCK_DENSITY_PATH)
-    glw4_data = imread(glw4_path, key=1)
+    glw4_data = imread(glw4_path, key=resolution)
     # FAO plots the prime meridian at the center whereas CMIP data places it at the left edge
     # glw4_data = np.roll(glw4_data, glw4_data.shape[1] // 2, axis=1)
     return glw4_data, glw4_data.shape
@@ -119,7 +124,10 @@ def initialize_earth_engine() -> None:
 def load_worldcereal_data() -> np.ndarray:
     if os.path.exists(os.path.join(BASE_PATH, "inputs/worldcereal_data.npy")):
         print("Loading cached WorldCereal data from numpy file.")
-        return np.load(os.path.join(BASE_PATH, "inputs/worldcereal_data.npy"))
+        data = np.load(os.path.join(BASE_PATH, "inputs/worldcereal_data.npy"))
+        # hack to rotate data
+        data = np.roll(data, shift=data.shape[1] // 2, axis=1)
+        return data
     cereal_data = ee.ImageCollection(WORLDCEREAL_ID).select("classification").mosaic()
     cereal_npy = ee.data.computePixels(
         {
@@ -254,7 +262,7 @@ def build_dataset(year=2015, process_ee=True) -> dict:
     match the GLW4 grid shape.
     """
 
-    glw4_data, glw4_shape = load_glw4_data()
+    glw4_data, glw4_shape = load_glw4_data(resolution=2)
     datasets = []
 
     # Process timeseries data
@@ -288,6 +296,7 @@ def build_dataset(year=2015, process_ee=True) -> dict:
         pasture_watch_data = upscale_to_glw4(glw4_shape, pasture_watch_data)
 
         city_distance_data = load_city_distance_data()
+        print(f"City distance data shape: {city_distance_data.shape}")
         city_distance_data = upscale_to_glw4(glw4_shape, city_distance_data)
 
         worldcereal_data = worldcereal_data.reshape(-1, 1)

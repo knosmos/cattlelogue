@@ -94,7 +94,7 @@ def visualize_predictions_year(
     if not use_cached:
         model = load(model_path)
 
-        dataset = build_dataset(year=year, process_ee=False)
+        dataset = build_dataset(year=year, process_ee=True)
         feature_vectors, livestock_data, glw4_shape = (
             dataset["features"],
             dataset["livestock_density"],
@@ -108,9 +108,6 @@ def visualize_predictions_year(
         predictions_masked[:] = -1
         predictions_masked[valid_indices] = predictions[valid_indices].flatten()
         predictions_reshaped = predictions_masked.reshape(glw4_shape)
-        predictions_reshaped = np.roll(
-            predictions_reshaped, predictions_reshaped.shape[1] // 2, axis=1
-        )
         if save_predictions:
             np.save(predictions_path, predictions_reshaped)
             print(f"Projections saved to {predictions_path}")

@@ -8,6 +8,7 @@ from sklearn.metrics import mean_squared_error
 import joblib
 import click
 from rich import print
+import os
 
 from cattlelogue.datasets import build_dataset
 
@@ -54,6 +55,8 @@ def train_model(test_size, n_estimators, ground_truth, output) -> None:
         feature_vectors, labels, test_size=test_size, random_state=42
     )
     print(f"Starting training run with {len(X_train)} samples")
+    print(f"Training set shape: {X_train.shape}, Labels shape: {y_train.shape}")
+    print(f"Sample of training data: {X_train[0]}")
 
     # Initialize and fit the model
     model = AdaBoostRegressor(
@@ -68,7 +71,7 @@ def train_model(test_size, n_estimators, ground_truth, output) -> None:
 
     model.fit(X_train, y_train.ravel())
 
-    joblib.dump(model, output)
+    joblib.dump(model, os.path.join("cattlelogue/outputs/", output))
     print(f"Model saved to {output}")
 
     y_pred = model.predict(X_test)
