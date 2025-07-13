@@ -46,6 +46,7 @@ def fourier(timeseries) -> tuple[np.ndarray, np.ndarray]:
     fourier_transform = np.fft.fft(timeseries)
     return np.abs(fourier_transform), freq
 
+
 def time_average(timeseries) -> np.ndarray:
     return np.mean(timeseries, axis=2)
 
@@ -304,9 +305,7 @@ def build_dataset(year=2015, process_ee=True) -> dict:
         pasture_watch_data = pasture_watch_data.reshape(-1, 1)
         city_distance_data = city_distance_data.reshape(-1, 1)
 
-        features = np.hstack(
-            (features, city_distance_data)
-        )
+        features = np.hstack((features, city_distance_data))
 
     return {
         "features": features,

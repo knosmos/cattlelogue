@@ -10,13 +10,10 @@ import os
 import numpy as np
 import click
 
+
 @click.command()
-@click.option(
-    "--epochs", type=int, default=50, help="Number of training epochs"
-)
-@click.option(
-    "--batch_size", type=int, default=16, help="Size of each training batch"
-)
+@click.option("--epochs", type=int, default=50, help="Number of training epochs")
+@click.option("--batch_size", type=int, default=16, help="Size of each training batch")
 @click.option(
     "--learning_rate", type=float, default=0.001, help="Initial learning rate"
 )
@@ -24,7 +21,10 @@ import click
     "--step_size", type=int, default=10, help="Step size for learning rate scheduler"
 )
 @click.option(
-    "--gamma", type=float, default=0.1, help="Multiplicative factor for learning rate decay"
+    "--gamma",
+    type=float,
+    default=0.1,
+    help="Multiplicative factor for learning rate decay",
 )
 def train_unet_model(
     epochs=50,
@@ -35,7 +35,7 @@ def train_unet_model(
 ):
     """
     Train a U-Net model for livestock density prediction.
-    
+
     Args:
         epochs (int): Number of training epochs.
         batch_size (int): Size of each training batch.
@@ -57,7 +57,7 @@ def train_unet_model(
     for epoch in range(epochs):
         model.train()
         total_loss = 0.0
-        
+
         for images, masks in train_loader:
             images, masks = images.cuda(), masks.cuda()
             optimizer.zero_grad()
@@ -72,6 +72,7 @@ def train_unet_model(
 
     print("Training complete.")
     torch.save(model.state_dict(), "unet_model.pth")
+
 
 if __name__ == "__main__":
     train_unet_model()

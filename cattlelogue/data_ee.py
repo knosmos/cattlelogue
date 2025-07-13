@@ -87,9 +87,7 @@ cereal_npy = ee.data.computePixels(
 data = cereal_npy["classification"]
 
 fig = plt.figure(figsize=(10, 5))
-#human_modif_npy_band = human_modif_npy["probability"]
+# human_modif_npy_band = human_modif_npy["probability"]
 # human_modif_npy_band[human_modif_npy_band < 0] = -1  # Mask out invalid data
-plt.imshow(
-    data, cmap="turbo", interpolation="nearest", vmin=0, vmax=100
-)
+plt.imshow(data, cmap="turbo", interpolation="nearest", vmin=0, vmax=100)
 plt.show()
