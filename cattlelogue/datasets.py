@@ -255,7 +255,25 @@ def load_pasture_watch_data() -> np.ndarray:
     return data
 
 
-def build_dataset(year=2015, process_ee=True) -> dict:
+""" RF FIRST STAGE RESULTS """
+
+
+def load_rf_results(prefix) -> np.ndarray:
+    """
+    Load the results of the Random Forest model inference.
+    The results are expected to be stored in a numpy file.
+    """
+    FILE_DIR = os.path.join(BASE_PATH, "outputs")
+    outputs = {}
+    for file in os.listdir(FILE_DIR):
+        if file.startswith(prefix) and file.endswith(".npy"):
+            file_path = os.path.join(FILE_DIR, file)
+            year = int(file.split("_")[1].split(".")[0])
+            outputs[year] = np.load(file_path)
+    return list(outputs.values())
+
+
+def build_dataset(year=2015, process_ee=True, flatten=True) -> dict:
     """
     Builds a dataset for livestock density prediction using GLW4 data and CMIP6 timeseries data.
     The dataset includes feature vectors from CMIP6 timeseries data and livestock density data from GLW4.
@@ -281,7 +299,10 @@ def build_dataset(year=2015, process_ee=True) -> dict:
     datasets = [data.astype(np.float64) for data in datasets]
     merged_datasets = cv2.merge(datasets)
     feature_vector_size = merged_datasets.shape[2]
-    features = merged_datasets.reshape(-1, feature_vector_size)
+    if flatten:
+        features = merged_datasets.reshape(-1, feature_vector_size)
+    else:
+        features = merged_datasets
 
     # Process EE data
     if process_ee:
@@ -300,16 +321,23 @@ def build_dataset(year=2015, process_ee=True) -> dict:
         print(f"City distance data shape: {city_distance_data.shape}")
         city_distance_data = upscale_to_glw4(glw4_shape, city_distance_data)
 
-        worldcereal_data = worldcereal_data.reshape(-1, 1)
-        human_modification_index = human_modification_index.reshape(-1, 1)
-        pasture_watch_data = pasture_watch_data.reshape(-1, 1)
-        city_distance_data = city_distance_data.reshape(-1, 1)
+        if flatten:
+            worldcereal_data = worldcereal_data.reshape(-1, 1)
+            human_modification_index = human_modification_index.reshape(-1, 1)
+            pasture_watch_data = pasture_watch_data.reshape(-1, 1)
+            city_distance_data = city_distance_data.reshape(-1, 1)
+        else:
+            worldcereal_data = worldcereal_data[:, :, np.newaxis]
+            human_modification_index = human_modification_index[:, :, np.newaxis]
+            pasture_watch_data = pasture_watch_data[:, :, np.newaxis]
+            city_distance_data = city_distance_data[:, :, np.newaxis]
 
-        features = np.hstack((features, city_distance_data))
+        # features = np.hstack((features, city_distance_data),)
+        features = np.concatenate((features, city_distance_data), axis=-1)
 
     return {
         "features": features,
-        "livestock_density": glw4_data.flatten(),
+        "livestock_density": glw4_data.flatten() if flatten else glw4_data,
         "worldcereal_data": worldcereal_data if process_ee else None,
         "human_modification_index": human_modification_index if process_ee else None,
         "pasture_watch_data": pasture_watch_data if process_ee else None,
