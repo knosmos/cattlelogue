@@ -132,7 +132,7 @@ def visualize_predictions_year(
         # predictions_masked[:] = -1
         # predictions_masked[valid_indices] = predictions[valid_indices].flatten()
         # predictions_reshaped = predictions_masked.reshape(glw4_shape)
-        predictions_reshaped = predictions.reshape(glw4_shape[0]+1, glw4_shape[1]+1)
+        predictions_reshaped = predictions.reshape(glw4_shape[0] + 1, glw4_shape[1] + 1)
         if save_predictions:
             np.save(predictions_path, predictions_reshaped)
             print(f"Projections saved to {predictions_path}")

@@ -87,7 +87,7 @@ def plot_mean_dist(results):
     plt.xlabel("Year".upper())
     plt.ylabel("Distance from Equator (degrees)".upper())
     plt.title(
-        "Mean Crop Distance from Equator".upper(),
+        "Mean Livestock Distance from Equator".upper(),
         fontsize=20,
         fontfamily=prop.get_name(),
     )
@@ -102,6 +102,6 @@ def plot_mean_dist(results):
 
 
 if __name__ == "__main__":
-    prefix = "crops_"
+    prefix = "livestock_"
     results = eval_over_time(prefix, mean_dist_from_equator)
     plot_mean_dist(results)

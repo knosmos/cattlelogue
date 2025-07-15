@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from torch.optim import Adam
 from torch.optim.lr_scheduler import StepLR
@@ -11,12 +10,11 @@ from cattlelogue.unet import UNet
 from cattlelogue.datasets import build_dataset, load_rf_results
 
 from rich import print
-import os
 import numpy as np
 import click
 
 
-def build_unet_data(year=2015, stride=16):
+def build_unet_data(year=2015, stride=4, ignore_ocean=True):
     """
     We need to break up our data into patches for training. Taking our
     large global map, we break it into smaller overlapping patches of size 32x32
@@ -24,7 +22,7 @@ def build_unet_data(year=2015, stride=16):
     """
 
     STRIDE = stride
-    PATCH_SIZE = 32
+    PATCH_SIZE = 16
 
     dataset = build_dataset(process_ee=True, flatten=False, year=year)
     # Load RF inference results
@@ -55,11 +53,14 @@ def build_unet_data(year=2015, stride=16):
     for i in range(0, features.shape[0] - PATCH_SIZE + 1, STRIDE):
         for j in range(0, features.shape[1] - PATCH_SIZE + 1, STRIDE):
             patch_features = features[i : i + PATCH_SIZE, j : j + PATCH_SIZE, :]
-            patches.append(patch_features)
             # instead of choosing the center pixel as in CNN, we take the whole patch
             # as ground truth mask
-            y.append(ground_truth[i : i + PATCH_SIZE, j : j + PATCH_SIZE] > 1)
+            gt_patch = ground_truth[i : i + PATCH_SIZE, j : j + PATCH_SIZE] > 0.5
+            if np.any(gt_patch) or not ignore_ocean:  # ignore ocean patches
+                patches.append(patch_features)
+                y.append(gt_patch)
 
+    print("Number of patches:", len(patches))
     return patches, y
 
 
@@ -137,8 +138,7 @@ def train_unet_model(epochs, batch_size, learning_rate, step_size, gamma):
             batch_features = np.stack(batch_features, axis=0)
             # reconfigure feature shape for (batch_size, channels, height, width)
             batch_features = batch_features.transpose(0, 3, 1, 2)
-            # print("example input:", batch_features[0])
-            # test for any NaN values in the batch
+            
             if np.isnan(batch_features).any():
                 print("NaN values found in batch features!")
                 continue
@@ -151,11 +151,6 @@ def train_unet_model(epochs, batch_size, learning_rate, step_size, gamma):
             batch_ground_truth = batch_ground_truth.to(device)
 
             optimizer.zero_grad()
-            # outputs = F.sigmoid(model(batch_features))
-            # print(
-            #     f"Batch shape: {batch_features.shape}, Ground truth shape: {batch_ground_truth.shape}"
-            # )
-            # print(outputs.squeeze(), batch_ground_truth.squeeze())
             outputs = model(batch_features)
             loss = criterion(outputs.squeeze(), batch_ground_truth.squeeze())
             loss.backward()
@@ -188,11 +183,14 @@ def train_unet_model(epochs, batch_size, learning_rate, step_size, gamma):
                 batch_ground_truth = batch_ground_truth.to(device)
 
                 outputs = model(batch_features)
-                loss = criterion(F.sigmoid(outputs.squeeze()), batch_ground_truth)
+                loss = criterion(outputs.squeeze(), batch_ground_truth)
                 val_loss += loss.item()
-                y_true = np.concatenate((y_true, batch_ground_truth.flatten().cpu().numpy()))
+                y_true = np.concatenate(
+                    (y_true, batch_ground_truth.flatten().cpu().numpy())
+                )
                 y_pred = np.concatenate((y_pred, outputs.flatten().cpu().numpy()))
             val_loss /= len(val_loader)
+
         print(f"Validation Loss: {val_loss:.4f}")
         print(f"Validation AUC: {roc_auc_score(y_true, y_pred):.4f}")
         if val_loss < best_val_loss:

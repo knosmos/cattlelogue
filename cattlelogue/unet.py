@@ -10,6 +10,7 @@ class UNet(nn.Module):
     Each encoder block halves the spatial dimensions while doubling the number of channels.
     Aggressive dropout by default to prevent overfitting.
     """
+
     def __init__(self, in_channels=52, out_channels=1, dropout_rate=0.3):
         super(UNet, self).__init__()
         self.dropout_rate = dropout_rate
@@ -68,5 +69,5 @@ class UNet(nn.Module):
         dec1 = torch.cat((dec1, enc1), dim=1)  # Skip connection
         out = self.final_conv(dec1)
         # print("shape after final conv:", out.shape)
-        
+
         return out

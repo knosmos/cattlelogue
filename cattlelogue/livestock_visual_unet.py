@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
 import click
@@ -98,57 +99,76 @@ def visualize_predictions_year(
     if not use_cached:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {device}")
-        dataset = build_unet_data(year=year, stride=32)
+
+        STRIDE = 16 // 4
+        FIELD = 16
+
+        dataset = build_unet_data(year=year, stride=STRIDE, ignore_ocean=False)
         feature_vectors, _ = dataset
         rf_dataset = build_dataset(process_ee=True, year=year)
         glw4_shape = rf_dataset["glw4_shape"]
 
+        # bit of a hack to create land mask
         valid_indices = np.where(rf_dataset["livestock_density"] >= 0)[0]
         print(valid_indices.shape, valid_indices)
         model = UNet(in_channels=feature_vectors[0][0].shape[-1], out_channels=1).to(
             device
         )
-        model.load_state_dict(torch.load(model_path))
+        model.load_state_dict(torch.load(model_path, weights_only=True))
 
         model.eval()
         loader = torch.utils.data.DataLoader(
             feature_vectors, batch_size=256, shuffle=False
         )
         print("Running inference ...")
-        predictions = np.empty((glw4_shape[0] + 64, glw4_shape[1] + 32), dtype=np.float32)
+        predictions = np.empty(
+            (glw4_shape[0] + FIELD, glw4_shape[1] + FIELD), dtype=np.float32
+        )
         with torch.no_grad():
             patch_index = 0
-            cols = glw4_shape[1] // 32 + 1
+            cols = glw4_shape[1] // STRIDE + 1
             for batch in tqdm(loader):
                 batch = np.stack(batch, axis=0)
                 batch = batch.transpose(
                     0, 3, 1, 2
                 )  # Reshape to (batch_size, channels, height, width)
                 batch = torch.tensor(batch, dtype=torch.float32).to(device)
-                outputs = model(batch)
+                outputs = F.sigmoid(model(batch))
                 outputs = outputs.cpu().numpy()
                 for i in range(outputs.shape[0]):
                     patch = outputs[i, 0, :, :]
                     patch = np.pad(
                         patch,
-                        ((0, 32 - patch.shape[0]), (0, 32 - patch.shape[1])),
+                        ((0, FIELD - patch.shape[0]), (0, FIELD - patch.shape[1])),
                         mode="constant",
                         constant_values=0,
                     )
+                    # crop center
+                    patch = patch[
+                        FIELD // 2 - STRIDE // 2 : FIELD // 2 + STRIDE // 2,
+                        FIELD // 2 - STRIDE // 2 : FIELD // 2 + STRIDE // 2,
+                    ]
                     predictions[
-                        patch_index // cols * 32 : patch_index // cols * 32 + 32,
-                        patch_index % cols * 32 : patch_index % cols * 32 + 32,
+                        patch_index // cols * STRIDE : patch_index // cols * STRIDE
+                        + STRIDE,
+                        patch_index % cols * STRIDE : patch_index % cols * STRIDE
+                        + STRIDE,
                     ] = patch
                     patch_index += 1
-        print(predictions)
-        print(predictions.shape)
 
-        predictions = predictions[: glw4_shape[0], : glw4_shape[1]]
+        # Crop to correct shape, since we padded it for inference
+        predictions = predictions[
+            STRIDE // 2 : glw4_shape[0] + STRIDE // 2,
+            STRIDE // 2 : glw4_shape[1] + STRIDE // 2,
+        ]
+
+        # Mask to land areas
         predictions = predictions.reshape(-1, 1)  # Flatten for masking
         predictions_masked = np.zeros(glw4_shape[0] * glw4_shape[1])
         predictions_masked[:] = -1
         predictions_masked[valid_indices] = predictions[valid_indices].flatten()
         predictions_reshaped = predictions_masked.reshape(glw4_shape)
+        # predictions_reshaped = predictions
         if save_predictions:
             np.save(predictions_path, predictions_reshaped)
             print(f"Projections saved to {predictions_path}")
@@ -164,8 +184,6 @@ def visualize_predictions_year(
         predictions_reshaped,
         cmap="viridis",
         interpolation="nearest",
-        vmin=-20,
-        vmax=0,
     )
     plt.gca().set_xticks([])
     plt.gca().set_yticks([])
