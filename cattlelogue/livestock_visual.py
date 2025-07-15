@@ -148,6 +148,7 @@ def visualize_predictions_year(
         predictions_reshaped,
         cmap="viridis",
         interpolation="nearest",
+        vmin=-200000,
     )
     plt.gca().set_xticks([])
     plt.gca().set_yticks([])
