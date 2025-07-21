@@ -16,7 +16,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 @click.option(
     "--model_path",
     type=str,
-    default="best_cnn_model.pth",
+    default="cattlelogue/outputs/best_cnn_model.pth",
     help="Path to the trained model",
 )
 @click.option(
