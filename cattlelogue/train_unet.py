@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torch.optim import Adam
+from torch.optim import AdamW
 from torch.optim.lr_scheduler import StepLR
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import roc_auc_score
@@ -26,8 +26,8 @@ def build_unet_data(year=2015, stride=4, ignore_ocean=True):
 
     dataset = build_dataset(process_ee=True, flatten=False, year=year)
     # Load RF inference results
-    crop_results = load_rf_results("crops_")[year - 2015][:, :, np.newaxis]
-    pasture_results = load_rf_results("pasture_")[year - 2015][:, :, np.newaxis]
+    crop_results = load_rf_results("crops_")[year][:, :, np.newaxis]
+    pasture_results = load_rf_results("pasture_")[year][:, :, np.newaxis]
     features = dataset["features"]
     features = np.concatenate((features, crop_results, pasture_results), axis=-1)
     features = np.pad(
@@ -110,7 +110,7 @@ def train_unet_model(epochs, batch_size, learning_rate, step_size, gamma):
     print("Livestock data statistics:", calc_livestock_stats(ground_truth))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = UNet(in_channels=patches[0][0].shape[-1], out_channels=1).to(device)
-    optimizer = Adam(model.parameters(), lr=learning_rate)
+    optimizer = AdamW(model.parameters(), lr=learning_rate)
     scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
 
     criterion = nn.BCEWithLogitsLoss()

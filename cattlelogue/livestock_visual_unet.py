@@ -5,6 +5,7 @@ import numpy as np
 import click
 import os
 from tqdm import tqdm
+import colormaps as cmaps
 
 from cattlelogue.unet import UNet
 from cattlelogue.train_unet import build_unet_data
@@ -182,7 +183,7 @@ def visualize_predictions_year(
     plt.title(f"Projected Livestock Density Map - {year}".upper(), weight="bold")
     plt.imshow(
         predictions_reshaped,
-        cmap="viridis",
+        cmap=cmaps.green_gr1214b,
         interpolation="nearest",
     )
     plt.gca().set_xticks([])

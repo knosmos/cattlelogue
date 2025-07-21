@@ -15,8 +15,15 @@ TIMESERIES_NC_PATHS = [
     "inputs/prsn_Amon_GISS-E2-1-G_ssp460_r1i1p1f2_gn_20150116-21001216.nc",
     "inputs/huss_Amon_GISS-E2-1-G_ssp460_r1i1p1f2_gn_20150116-21001216.nc",
 ]
+HISTORICAL_NC_PATHS = [
+    "inputs/ts_Amon_E3SM-1-1-ECA_historical_r1i1p1f1_gr_19500116-20141216.nc",
+    "inputs/pr_Amon_E3SM-1-1-ECA_historical_r1i1p1f1_gr_19500116-20141216.nc",
+    "inputs/prsn_Amon_E3SM-1-1-ECA_historical_r1i1p1f1_gr_19500116-20141216.nc",
+    "inputs/huss_Amon_E3SM-1-1-ECA_historical_r1i1p1f1_gr_19500116-20141216.nc",
+]
 FIXEDDATA_NC_PATHS = ["inputs/orog_fx_CanESM5_ssp460_r1i1p1f1_gn.nc"]
 LIVESTOCK_DENSITY_PATH = "inputs/GLW4-2020.D-DA.CTL.tif"
+HISTORICAL_LIVESTOCK_PREFIX = "inputs/Cattle_Reprojected/Cattl_"
 file_error_flag = False
 for path in TIMESERIES_NC_PATHS + FIXEDDATA_NC_PATHS + [LIVESTOCK_DENSITY_PATH]:
     full_path = os.path.join(BASE_PATH, path)
@@ -65,12 +72,12 @@ def upscale_to_glw4(glw4_shape, cmip_data) -> np.ndarray:
     return cmip_data_resized
 
 
-def year_to_index(year) -> int:
-    return (year - 2015) * 12
+def year_to_index(year, st_year=2015) -> int:
+    return (year - st_year) * 12
 
 
-def process_timeseries_data(timeseries_fname, shape, year=2015) -> np.ndarray:
-    start, end = year_to_index(year), year_to_index(year + 1)
+def process_timeseries_data(timeseries_fname, shape, year=2015, st_year=2015) -> np.ndarray:
+    start, end = year_to_index(year, st_year), year_to_index(year + 1, st_year)
     with nc.Dataset(timeseries_fname) as ds:
         for var_name, data in ds.variables.items():
             if var_name in timeseries_fname.split("/")[-1].split("_"):
@@ -103,10 +110,40 @@ def process_fixed_data(fixed_data, shape) -> np.ndarray:
 
 def load_glw4_data(resolution=1) -> tuple[np.ndarray, tuple[int, int]]:
     glw4_path = os.path.join(BASE_PATH, LIVESTOCK_DENSITY_PATH)
+    import tifffile
     glw4_data = imread(glw4_path, key=resolution)
+    metadata = tifffile.TiffFile(glw4_path).pages[0].geotiff_tags
+    print(metadata)
     # FAO plots the prime meridian at the center whereas CMIP data places it at the left edge
     # glw4_data = np.roll(glw4_data, glw4_data.shape[1] // 2, axis=1)
     return glw4_data, glw4_data.shape
+
+
+def load_aglw_data(year, resolution=1) -> tuple[np.ndarray, tuple[int, int]]:
+    """
+    Load the AGLW data for a given year and resolution.
+    The data is expected to be stored in a TIFF file.
+    """
+    aglw_path = os.path.join(BASE_PATH, f"{HISTORICAL_LIVESTOCK_PREFIX}{year}.tif")
+    aglw_data = imread(aglw_path, key=0)
+
+    # AGLW_TIE = [-168.83835765026407, 84.21705788620514, 0.0]
+    # GLW4_TIE = [-180.0, 90.0, 0.0]
+    # TIE_DIFF = [AGLW_TIE[0] - GLW4_TIE[0], AGLW_TIE[1] - GLW4_TIE[1], 0.0]
+    # TIE_DIFF_PERCENT = [TIE_DIFF[0] / 360.0, TIE_DIFF[1] / 180.0, 0.0]
+    # # so GLW4 and AGLW very annoyingly have different model tie points
+    # # we need to adjust the AGLW data to match GLW4's tie points
+    # aglw_data = np.roll(aglw_data, shift=int(aglw_data.shape[1] * TIE_DIFF_PERCENT[0]), axis=1)
+    # aglw_data = np.roll(aglw_data, shift=-int(aglw_data.shape[0] * TIE_DIFF_PERCENT[1]), axis=0)
+    
+    import tifffile
+    metadata = tifffile.TiffFile(aglw_path).pages[0].geotiff_tags
+    print(metadata)
+    # hack so my computer doesn't bluescreen
+    #SHAPE = (540, 1080)
+    #aglw_data = cv2.resize(aglw_data, (0,0), fx=0.2, fy=0.2, interpolation=cv2.INTER_AREA)
+    print(f"Loaded AGLW data for year {year} with shape {aglw_data.shape}")
+    return aglw_data, aglw_data.shape
 
 
 """ EARTH ENGINE DATASETS """
@@ -270,7 +307,7 @@ def load_rf_results(prefix) -> np.ndarray:
             file_path = os.path.join(FILE_DIR, file)
             year = int(file.split("_")[1].split(".")[0])
             outputs[year] = np.load(file_path)
-    return list(outputs.values())
+    return outputs
 
 
 def build_dataset(year=2015, process_ee=True, flatten=True) -> dict:
@@ -281,16 +318,27 @@ def build_dataset(year=2015, process_ee=True, flatten=True) -> dict:
     match the GLW4 grid shape.
     """
 
+    # if year < 2015:
+    #     glw4_data, glw4_shape = load_aglw_data(year)
+    # else:
     glw4_data, glw4_shape = load_glw4_data(resolution=2)
     datasets = []
 
     # Process timeseries data
-    for path in TIMESERIES_NC_PATHS:
-        datasets.append(
-            process_timeseries_data(
-                os.path.join(BASE_PATH, path), glw4_shape, year=year
+    if year >= 2015:
+        for path in TIMESERIES_NC_PATHS:
+            datasets.append(
+                process_timeseries_data(
+                    os.path.join(BASE_PATH, path), glw4_shape, year=year
+                )
             )
-        )
+    else:
+        for path in HISTORICAL_NC_PATHS:
+            datasets.append(
+                process_timeseries_data(
+                    os.path.join(BASE_PATH, path), glw4_shape, year=year, st_year=1950
+                )
+            )
 
     # Process fixed data
     for path in FIXEDDATA_NC_PATHS:
