@@ -11,7 +11,7 @@ class UNet(nn.Module):
     Aggressive dropout by default to prevent overfitting.
     """
 
-    def __init__(self, in_channels=52, out_channels=1, dropout_rate=0.3):
+    def __init__(self, in_channels=52, out_channels=1, dropout_rate=0.4):
         super(UNet, self).__init__()
         self.dropout_rate = dropout_rate
 

@@ -40,7 +40,8 @@ def load_inference_results(prefix):
         if file.startswith(prefix) and file.endswith(".npy"):
             file_path = os.path.join(FILE_DIR, file)
             year = int(file.split("_")[1].split(".")[0])
-            outputs[year] = np.load(file_path)
+            if year >= 2015:
+                outputs[year] = np.load(file_path)
     return outputs
 
 
