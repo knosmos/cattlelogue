@@ -14,12 +14,16 @@ TIMESERIES_NC_PATHS = [
     "inputs/pr_Amon_GISS-E2-1-G_ssp460_r1i1p1f2_gn_20150116-21001216.nc",
     "inputs/prsn_Amon_GISS-E2-1-G_ssp460_r1i1p1f2_gn_20150116-21001216.nc",
     "inputs/huss_Amon_GISS-E2-1-G_ssp460_r1i1p1f2_gn_20150116-21001216.nc",
+    "inputs/tasmax_Amon_CanESM5_ssp460_r1i1p1f1_gn_20150116-21001216.nc",
+    "inputs/tasmin_Amon_CanESM5_ssp460_r1i1p1f1_gn_20150116-21001216.nc",
 ]
 HISTORICAL_NC_PATHS = [
     "inputs/ts_Amon_E3SM-1-1-ECA_historical_r1i1p1f1_gr_19500116-20141216.nc",
     "inputs/pr_Amon_E3SM-1-1-ECA_historical_r1i1p1f1_gr_19500116-20141216.nc",
     "inputs/prsn_Amon_E3SM-1-1-ECA_historical_r1i1p1f1_gr_19500116-20141216.nc",
     "inputs/huss_Amon_E3SM-1-1-ECA_historical_r1i1p1f1_gr_19500116-20141216.nc",
+    "inputs/tasmax_Amon_CanESM5_historical_r1i1p1f1_gn_19500116-20141216.nc",
+    "inputs/tasmin_Amon_CanESM5_historical_r1i1p1f1_gn_19500116-20141216.nc",
 ]
 FIXEDDATA_NC_PATHS = ["inputs/orog_fx_CanESM5_ssp460_r1i1p1f1_gn.nc"]
 LIVESTOCK_DENSITY_PATH = "inputs/GLW4-2020.D-DA.CTL.tif"
@@ -41,7 +45,10 @@ if file_error_flag:
 WORLDCEREAL_ID = "ESA/WorldCereal/2021/MODELS/v100"
 HUMAN_MODIF_ID = "CSP/HM/GlobalHumanModification"
 PASTURE_WCH_ID = "projects/global-pasture-watch/assets/ggc-30m/v1/cultiv-grassland_p"
+
 CITY_DISTAN_ID = "Oxford/MAP/accessibility_to_cities_2015_v1_0"
+LANDFORMS_ID = "CSP/ERGo/1_0/Global/ALOS_landforms"
+
 SCALE_FACTOR = 10
 
 """ LOCALLY STORED DATASETS """
@@ -254,6 +261,35 @@ def load_city_distance_data() -> np.ndarray:
     print(f"City Distance data loaded with shape {data.shape}")
     return data
 
+def load_landforms_data() -> np.ndarray:
+    if os.path.exists(os.path.join(BASE_PATH, "inputs/landforms.npy")):
+        print("Loading cached Landforms data from numpy file.")
+        return np.load(os.path.join(BASE_PATH, "inputs/landforms.npy"))
+    landforms = ee.Image(LANDFORMS_ID).select("constant")
+    landforms_npy = ee.data.computePixels(
+        {
+            "expression": landforms,
+            "fileFormat": "NUMPY_NDARRAY",
+            "grid": {
+                "dimensions": {
+                    "width": 360 * SCALE_FACTOR,
+                    "height": 180 * SCALE_FACTOR,
+                },
+                "affineTransform": {
+                    "scaleX": 1 / SCALE_FACTOR,
+                    "shearX": 0,
+                    "translateX": -180,
+                    "shearY": 0,
+                    "scaleY": -1 / SCALE_FACTOR,
+                    "translateY": 90,
+                },
+            },
+        }
+    )
+    data = landforms_npy["constant"]
+    np.save(os.path.join(BASE_PATH, "inputs/landforms.npy"), data)
+    print(f"Landforms data loaded with shape {data.shape}")
+    return data
 
 def load_pasture_watch_data() -> np.ndarray:
     if os.path.exists(os.path.join(BASE_PATH, "inputs/pasture_watch.npy")):
@@ -321,7 +357,7 @@ def build_dataset(year=2015, process_ee=True, flatten=True) -> dict:
     # if year < 2015:
     #     glw4_data, glw4_shape = load_aglw_data(year)
     # else:
-    glw4_data, glw4_shape = load_glw4_data(resolution=2)
+    glw4_data, glw4_shape = load_glw4_data(resolution=1)
     datasets = []
 
     # Process timeseries data
@@ -369,19 +405,24 @@ def build_dataset(year=2015, process_ee=True, flatten=True) -> dict:
         print(f"City distance data shape: {city_distance_data.shape}")
         city_distance_data = upscale_to_glw4(glw4_shape, city_distance_data)
 
+        landforms_data = load_landforms_data()
+        landforms_data = upscale_to_glw4(glw4_shape, landforms_data)
+
         if flatten:
             worldcereal_data = worldcereal_data.reshape(-1, 1)
             human_modification_index = human_modification_index.reshape(-1, 1)
             pasture_watch_data = pasture_watch_data.reshape(-1, 1)
             city_distance_data = city_distance_data.reshape(-1, 1)
+            landforms_data = landforms_data.reshape(-1, 1)
         else:
             worldcereal_data = worldcereal_data[:, :, np.newaxis]
             human_modification_index = human_modification_index[:, :, np.newaxis]
             pasture_watch_data = pasture_watch_data[:, :, np.newaxis]
             city_distance_data = city_distance_data[:, :, np.newaxis]
+            landforms_data = landforms_data[:, :, np.newaxis]
 
         # features = np.hstack((features, city_distance_data),)
-        features = np.concatenate((features, city_distance_data), axis=-1)
+        features = np.concatenate((features, city_distance_data, landforms_data), axis=-1)
 
     return {
         "features": features,

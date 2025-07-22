@@ -11,10 +11,11 @@ from cattlelogue.datasets import build_dataset, load_rf_results
 
 from rich import print
 import numpy as np
+import cv2
 import click
 
 
-def build_unet_data(year=2015, stride=4, ignore_ocean=True):
+def build_unet_data(year=2015, stride=8, ignore_ocean=True):
     """
     We need to break up our data into patches for training. Taking our
     large global map, we break it into smaller overlapping patches of size 32x32
@@ -22,12 +23,19 @@ def build_unet_data(year=2015, stride=4, ignore_ocean=True):
     """
 
     STRIDE = stride
-    PATCH_SIZE = 16
+    PATCH_SIZE = 32
 
     dataset = build_dataset(process_ee=True, flatten=False, year=year)
     # Load RF inference results
-    crop_results = load_rf_results("crops_")[year][:, :, np.newaxis]
-    pasture_results = load_rf_results("pasture_")[year][:, :, np.newaxis]
+    crop_results = load_rf_results("crops_")[year]
+    pasture_results = load_rf_results("pasture_")[year]
+    # HACK upscale results to match the dataset resolution
+    crop_results = cv2.resize(
+        crop_results, (dataset["glw4_shape"][1], dataset["glw4_shape"][0]), interpolation=cv2.INTER_CUBIC
+    )[:, :, np.newaxis]
+    pasture_results = cv2.resize(
+        pasture_results, (dataset["glw4_shape"][1], dataset["glw4_shape"][0]), interpolation=cv2.INTER_CUBIC
+    )[:, :, np.newaxis]
     features = dataset["features"]
     features = np.concatenate((features, crop_results, pasture_results), axis=-1)
     features = np.pad(

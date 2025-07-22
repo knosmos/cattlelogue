@@ -101,8 +101,8 @@ def visualize_predictions_year(
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         print(f"Using device: {device}")
 
-        STRIDE = 16 // 4
-        FIELD = 16
+        STRIDE = 8#16 // 4
+        FIELD = 32#16
 
         dataset = build_unet_data(year=year, stride=STRIDE, ignore_ocean=False)
         feature_vectors, _ = dataset

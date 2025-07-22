@@ -11,7 +11,7 @@ from cattlelogue.datasets import load_glw4_data
 @click.option(
     "--prefix",
     type=str,
-    default="crops_",
+    default="crops",
     help="Prefix for the files to load (e.g., 'crops', 'pasture')",
 )
 @click.option(
@@ -50,7 +50,7 @@ def plot_delta(prefix, year_start, year_end, window):
     delta = np.mean(year_end_datas, axis=0) - np.mean(year_start_datas, axis=0)
 
     # hack for masking land areas
-    glw4_data = load_glw4_data(resolution=2)
+    glw4_data = load_glw4_data(resolution=1)
     land_mask = glw4_data[0] >= 0
     delta_masked = np.ma.masked_where(~land_mask, delta)
 
@@ -59,9 +59,9 @@ def plot_delta(prefix, year_start, year_end, window):
     plt.title(f"Change in {prefix} | {year_start}-{year_end}".upper(), weight="bold")
     plt.imshow(
         delta_masked,
-        cmap="coolwarm",
-        vmin=-np.max(np.abs(delta_masked)),
-        vmax=np.max(np.abs(delta_masked)),
+        cmap="coolwarm_r",
+        vmin=-np.max(np.abs(delta_masked))/2,
+        vmax=np.max(np.abs(delta_masked))/2,
         interpolation="nearest",
     )
     plt.gca().set_xticks([])
