@@ -21,6 +21,8 @@ class UNet(nn.Module):
         self.encoder4 = self.conv_block(256, 512)
 
         self.bottleneck = self.conv_block(512, 1024)
+        self.bottleneck_2 = self.conv_block(1024, 1024)
+        self.bottleneck_3 = self.conv_block(1024, 1024)
 
         # Decoder block shapes have this structure
         # since we do concatenation (skip connections) with the encoder layers
@@ -54,6 +56,8 @@ class UNet(nn.Module):
         enc4 = self.encoder4(F.max_pool2d(enc3, kernel_size=2))
 
         bottleneck = self.bottleneck(F.max_pool2d(enc4, kernel_size=2))
+        bottleneck = self.bottleneck_2(bottleneck)
+        # bottleneck = self.bottleneck_3(bottleneck)
         # print("shape after bottleneck:", bottleneck.shape)
 
         dec4 = self.decoder4(bottleneck)

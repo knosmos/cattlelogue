@@ -13,7 +13,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 @click.option(
     "--model_path",
     type=str,
-    default="livestock_model.joblib",
+    default="pasture_model.joblib",
     help="Path to the trained model",
 )
 @click.option(

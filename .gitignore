@@ -4,3 +4,4 @@ __pycache__/
 # ignore large files
 *.nc
 *.tif
+*.pth

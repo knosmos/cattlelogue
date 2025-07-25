@@ -22,7 +22,7 @@ def calc_auc_aglw_unet(year):
     glw4_flat = glw4_data.flatten()
 
     # Filter out invalid values
-    valid_mask = np.where(glw4_flat >= -1000)
+    valid_mask = np.where(glw4_flat >= 0)
     print(np.mean(aglw_flat))
     print(aglw_flat[valid_mask], valid_mask)
     # avg of aglw_flat

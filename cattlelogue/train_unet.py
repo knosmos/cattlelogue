@@ -15,7 +15,7 @@ import cv2
 import click
 
 
-def build_unet_data(year=2015, stride=8, ignore_ocean=True):
+def build_unet_data(year=2015, stride=16, ignore_ocean=True):
     """
     We need to break up our data into patches for training. Taking our
     large global map, we break it into smaller overlapping patches of size 32x32
@@ -24,7 +24,7 @@ def build_unet_data(year=2015, stride=8, ignore_ocean=True):
 
     STRIDE = stride
     PATCH_SIZE = 32
-
+    
     dataset = build_dataset(process_ee=True, flatten=False, year=year)
     # Load RF inference results
     crop_results = load_rf_results("crops_")[year]
@@ -48,9 +48,15 @@ def build_unet_data(year=2015, stride=8, ignore_ocean=True):
         mode="wrap",
     )
 
-    ground_truth = dataset["livestock_density"]
+    ground_truth = dataset["aglw_data"]
     ground_truth = np.pad(
         ground_truth,
+        ((PATCH_SIZE // 2, PATCH_SIZE // 2), (PATCH_SIZE // 2, PATCH_SIZE // 2)),
+        mode="wrap",
+    )
+    land_patch = dataset["livestock_density"] # HACK
+    land_patch = np.pad(
+        land_patch,
         ((PATCH_SIZE // 2, PATCH_SIZE // 2), (PATCH_SIZE // 2, PATCH_SIZE // 2)),
         mode="wrap",
     )
@@ -63,14 +69,53 @@ def build_unet_data(year=2015, stride=8, ignore_ocean=True):
             patch_features = features[i : i + PATCH_SIZE, j : j + PATCH_SIZE, :]
             # instead of choosing the center pixel as in CNN, we take the whole patch
             # as ground truth mask
-            gt_patch = ground_truth[i : i + PATCH_SIZE, j : j + PATCH_SIZE] > 0.5
-            if np.any(gt_patch) or not ignore_ocean:  # ignore ocean patches
+            gt_patch = ground_truth[i : i + PATCH_SIZE, j : j + PATCH_SIZE] > 2
+            land_patch_patch = land_patch[i : i + PATCH_SIZE, j : j + PATCH_SIZE] >= 0
+            if np.any(land_patch_patch) or not ignore_ocean:  # ignore ocean patches
                 patches.append(patch_features)
                 y.append(gt_patch)
 
     print("Number of patches:", len(patches))
     return patches, y
 
+def augment_patches(patches, ground_truth):
+    """
+    Augment the patches by flipping them horizontally and vertically.
+    """
+    augmented_patches = []
+    augmented_ground_truth = []
+
+    for patch, gt in zip(patches, ground_truth):
+
+        # Original patch
+        augmented_patches.append(patch)
+        augmented_ground_truth.append(gt)
+
+        # Horizontal flip
+        augmented_patches.append(np.fliplr(patch))
+        augmented_ground_truth.append(np.fliplr(gt))
+
+        # Vertical flip
+        augmented_patches.append(np.flipud(patch))
+        augmented_ground_truth.append(np.flipud(gt))
+
+        # Rotations
+        augmented_patches.append(np.rot90(patch, k=1))
+        augmented_ground_truth.append(np.rot90(gt, k=1))
+        augmented_patches.append(np.rot90(patch, k=2))
+        augmented_ground_truth.append(np.rot90(gt, k=2))
+
+    augmented_patches_copied = []
+    augmented_ground_truth_copied = []
+    for patch, gt in zip(augmented_patches, augmented_ground_truth):
+        patch = patch.astype(np.float32)
+        gt = gt.astype(np.float32)
+
+        augmented_patches_copied.append(patch)
+        augmented_ground_truth_copied.append(gt)
+
+    print("Number of augmented patches:", len(augmented_patches))
+    return augmented_patches_copied, augmented_ground_truth_copied
 
 def calc_livestock_stats(ground_truth):
     """
@@ -91,7 +136,7 @@ def calc_livestock_stats(ground_truth):
 
 @click.command()
 @click.option("--epochs", type=int, default=20, help="Number of training epochs")
-@click.option("--batch_size", type=int, default=256, help="Size of each training batch")
+@click.option("--batch_size", type=int, default=32, help="Size of each training batch")
 @click.option(
     "--learning_rate", type=float, default=0.001, help="Initial learning rate"
 )
@@ -114,7 +159,14 @@ def train_unet_model(epochs, batch_size, learning_rate, step_size, gamma):
         step_size (int): Step size for the learning rate scheduler.
         gamma (float): Multiplicative factor for learning rate decay.
     """
-    patches, ground_truth = build_unet_data()
+    patches, ground_truth = [], []
+    for year in range(2000, 2015, 5):
+        year_patches, year_ground_truth = build_unet_data(year=year)
+        year_patches, year_ground_truth = augment_patches(year_patches, year_ground_truth)
+        patches.extend(year_patches)
+        ground_truth.extend(year_ground_truth)
+    # patches, ground_truth = build_unet_data()
+    # patches, ground_truth = augment_patches(patches, ground_truth)
     print("Livestock data statistics:", calc_livestock_stats(ground_truth))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = UNet(in_channels=patches[0][0].shape[-1], out_channels=1).to(device)
@@ -200,9 +252,12 @@ def train_unet_model(epochs, batch_size, learning_rate, step_size, gamma):
             val_loss /= len(val_loader)
 
         print(f"Validation Loss: {val_loss:.4f}")
-        print(f"Validation AUC: {roc_auc_score(y_true, y_pred):.4f}")
+        auc_score = roc_auc_score(y_true, y_pred)
+        print(f"Validation AUC: {auc_score:.4f}")
         if val_loss < best_val_loss:
             best_val_loss = val_loss
+        # if auc_score > best_val_loss:
+        #     best_val_loss = auc_score
             torch.save(model.state_dict(), "best_unet_model.pth")
             print("Saved best model.")
 

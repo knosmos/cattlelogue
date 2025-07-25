@@ -48,7 +48,7 @@ PASTURE_WCH_ID = "projects/global-pasture-watch/assets/ggc-30m/v1/cultiv-grassla
 
 CITY_DISTAN_ID = "Oxford/MAP/accessibility_to_cities_2015_v1_0"
 LANDFORMS_ID = "CSP/ERGo/1_0/Global/ALOS_landforms"
-WATER_RISK_ID = "WRI/Aqueduct_Water_Risk/V4/future_annual"
+WATER_AVAIL_ID = "WRI/Aqueduct_Water_Risk/V4/future_annual"
 
 SCALE_FACTOR = 10
 
@@ -405,6 +405,7 @@ def load_water_avail_data(year) -> np.ndarray:
         # Extrapolate backwards
         slope = (water_avail_2050 - water_avail_2030) / (2050 - 2030)
         water_avail = water_avail_2030 + slope * (year - 2030)
+        # water_avail = water_avail_2030
     elif year > 2080:
         # Extrapolate forwards
         slope = (water_avail_2080 - water_avail_2050) / (2080 - 2050)
@@ -451,6 +452,10 @@ def build_dataset(year=2015, process_ee=True, flatten=True) -> dict:
     #     glw4_data, glw4_shape = load_aglw_data(year)
     # else:
     glw4_data, glw4_shape = load_glw4_data(resolution=1)
+    aglw_data = None
+    if year <= 2015:
+        aglw_data, _ = load_aglw_data(year, resolution=1)
+        aglw_data = upscale_to_glw4(glw4_shape, glw4_data)
     datasets = []
 
     # Process timeseries data
@@ -525,6 +530,7 @@ def build_dataset(year=2015, process_ee=True, flatten=True) -> dict:
     return {
         "features": features,
         "livestock_density": glw4_data.flatten() if flatten else glw4_data,
+        "aglw_data": aglw_data.flatten() if flatten else aglw_data,
         "worldcereal_data": worldcereal_data if process_ee else None,
         "human_modification_index": human_modification_index if process_ee else None,
         "pasture_watch_data": pasture_watch_data if process_ee else None,
