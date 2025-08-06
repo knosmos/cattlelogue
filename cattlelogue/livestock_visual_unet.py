@@ -18,7 +18,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 @click.option(
     "--model_path",
     type=str,
-    default="best_unet_model.pth",
+    default="best_unet_model_best.pth",
     help="Path to the trained model",
 )
 @click.option(
@@ -134,7 +134,8 @@ def visualize_predictions_year(
                     0, 3, 1, 2
                 )  # Reshape to (batch_size, channels, height, width)
                 batch = torch.tensor(batch, dtype=torch.float32).to(device)
-                outputs = F.sigmoid(model(batch))
+                #outputs = F.sigmoid(model(batch))
+                outputs = model(batch)
                 outputs = outputs.cpu().numpy()
                 for i in range(outputs.shape[0]):
                     patch = outputs[i, 0, :, :]

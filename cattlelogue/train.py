@@ -2,6 +2,7 @@ import numpy as np
 
 from sklearn.ensemble import AdaBoostRegressor, RandomForestRegressor
 from sklearn.tree import DecisionTreeRegressor
+from xgboost import XGBRegressor
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 
@@ -21,7 +22,7 @@ from cattlelogue.datasets import build_dataset
     "--test_size", type=float, default=0.1, help="Proportion of data to use for testing"
 )
 @click.option(
-    "--n_estimators", type=int, default=100, help="Number of estimators for AdaBoost"
+    "--n_estimators", type=int, default=200, help="Number of estimators for AdaBoost"
 )
 @click.option(
     "--ground_truth",
@@ -59,12 +60,19 @@ def train_model(test_size, n_estimators, ground_truth, output) -> None:
     print(f"Sample of training data: {X_train[0]}")
 
     # Initialize and fit the model
-    model = AdaBoostRegressor(
-        # estimator=RandomForestRegressor(n_estimators=50, random_state=42, verbose=1),
-        estimator=DecisionTreeRegressor(
-            max_depth=4, min_samples_split=100, random_state=42
-        ),
+    # model = AdaBoostRegressor(
+    #     # estimator=RandomForestRegressor(n_estimators=50, random_state=42, verbose=1),
+    #     estimator=DecisionTreeRegressor(
+    #         max_depth=4, min_samples_split=100, random_state=42
+    #     ),
+    #     n_estimators=n_estimators,
+    #     random_state=42,
+    # )
+    model = XGBRegressor(
         n_estimators=n_estimators,
+        max_depth=4,
+        objective="reg:squarederror",
+        learning_rate=0.1,
         random_state=42,
     )
     print("Model parameters:", model.get_params())
