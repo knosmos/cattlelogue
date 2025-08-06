@@ -48,12 +48,18 @@ def build_unet_data(year=2015, stride=16, ignore_ocean=True):
         mode="wrap",
     )
 
-    ground_truth = dataset["aglw_data"]
-    ground_truth = np.pad(
-        ground_truth,
-        ((PATCH_SIZE // 2, PATCH_SIZE // 2), (PATCH_SIZE // 2, PATCH_SIZE // 2)),
-        mode="wrap",
-    )
+    if dataset["aglw_data"] is not None:
+        ground_truth = dataset["aglw_data"]
+        ground_truth = np.pad(
+            ground_truth,
+            ((PATCH_SIZE // 2, PATCH_SIZE // 2), (PATCH_SIZE // 2, PATCH_SIZE // 2)),
+            mode="wrap",
+        )
+    else:
+        ground_truth = np.zeros(
+            (dataset["glw4_shape"][0] + PATCH_SIZE, dataset["glw4_shape"][1] + PATCH_SIZE),
+            dtype=np.float32,
+        )
     land_patch = dataset["livestock_density"] # HACK
     land_patch = np.pad(
         land_patch,
@@ -69,7 +75,7 @@ def build_unet_data(year=2015, stride=16, ignore_ocean=True):
             patch_features = features[i : i + PATCH_SIZE, j : j + PATCH_SIZE, :]
             # instead of choosing the center pixel as in CNN, we take the whole patch
             # as ground truth mask
-            gt_patch = ground_truth[i : i + PATCH_SIZE, j : j + PATCH_SIZE] > 2
+            gt_patch = np.maximum(ground_truth[i : i + PATCH_SIZE, j : j + PATCH_SIZE], 0) # > 2
             land_patch_patch = land_patch[i : i + PATCH_SIZE, j : j + PATCH_SIZE] >= 0
             if np.any(land_patch_patch) or not ignore_ocean:  # ignore ocean patches
                 patches.append(patch_features)
@@ -160,7 +166,7 @@ def train_unet_model(epochs, batch_size, learning_rate, step_size, gamma):
         gamma (float): Multiplicative factor for learning rate decay.
     """
     patches, ground_truth = [], []
-    for year in range(2000, 2015, 5):
+    for year in range(2000, 2016, 5):
         year_patches, year_ground_truth = build_unet_data(year=year)
         year_patches, year_ground_truth = augment_patches(year_patches, year_ground_truth)
         patches.extend(year_patches)
@@ -173,7 +179,8 @@ def train_unet_model(epochs, batch_size, learning_rate, step_size, gamma):
     optimizer = AdamW(model.parameters(), lr=learning_rate)
     scheduler = StepLR(optimizer, step_size=step_size, gamma=gamma)
 
-    criterion = nn.BCEWithLogitsLoss()
+    #criterion = nn.BCEWithLogitsLoss()
+    criterion = nn.MSELoss()
 
     train_patches, val_patches, train_y, val_y = train_test_split(
         patches, ground_truth, test_size=0.2, random_state=42
@@ -252,8 +259,8 @@ def train_unet_model(epochs, batch_size, learning_rate, step_size, gamma):
             val_loss /= len(val_loader)
 
         print(f"Validation Loss: {val_loss:.4f}")
-        auc_score = roc_auc_score(y_true, y_pred)
-        print(f"Validation AUC: {auc_score:.4f}")
+        # auc_score = roc_auc_score(y_true>1, y_pred)
+        # print(f"Validation AUC: {auc_score:.4f}")
         if val_loss < best_val_loss:
             best_val_loss = val_loss
         # if auc_score > best_val_loss:

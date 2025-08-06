@@ -403,9 +403,9 @@ def load_water_avail_data(year) -> np.ndarray:
 
     if year < 2030:
         # Extrapolate backwards
-        slope = (water_avail_2050 - water_avail_2030) / (2050 - 2030)
-        water_avail = water_avail_2030 + slope * (year - 2030)
-        # water_avail = water_avail_2030
+        # slope = (water_avail_2050 - water_avail_2030) / (2050 - 2030)
+        # water_avail = water_avail_2030 + slope * (year - 2030)
+        water_avail = water_avail_2030
     elif year > 2080:
         # Extrapolate forwards
         slope = (water_avail_2080 - water_avail_2050) / (2080 - 2050)
@@ -455,7 +455,7 @@ def build_dataset(year=2015, process_ee=True, flatten=True) -> dict:
     aglw_data = None
     if year <= 2015:
         aglw_data, _ = load_aglw_data(year, resolution=1)
-        aglw_data = upscale_to_glw4(glw4_shape, glw4_data)
+        aglw_data = upscale_to_glw4(glw4_shape, aglw_data)
     datasets = []
 
     # Process timeseries data
@@ -527,12 +527,16 @@ def build_dataset(year=2015, process_ee=True, flatten=True) -> dict:
         # features = np.hstack((features, city_distance_data),)
         features = np.concatenate((features, city_distance_data, landforms_data, water_risk_data), axis=-1)
 
-    return {
+    ret = {
         "features": features,
         "livestock_density": glw4_data.flatten() if flatten else glw4_data,
-        "aglw_data": aglw_data.flatten() if flatten else aglw_data,
         "worldcereal_data": worldcereal_data if process_ee else None,
         "human_modification_index": human_modification_index if process_ee else None,
         "pasture_watch_data": pasture_watch_data if process_ee else None,
         "glw4_shape": glw4_shape,
     }
+    if aglw_data is not None:
+        ret["aglw_data"] = aglw_data.flatten() if flatten else aglw_data
+    else:
+        ret["aglw_data"] = None
+    return ret
